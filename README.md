@@ -1,135 +1,202 @@
 # DRI-HeteroPktProc
 
-Reproducibility artifact for the paper:
+## Energy-Efficient Heterogeneous Packet Processing for Digital Research Infrastructures: SmartNIC Offloading and Adaptive CPU Power Management
 
-**Energy-Efficient Heterogeneous Packet Processing for Digital Research Infrastructures: SmartNIC Offloading and Adaptive CPU Power Management**
+**Mohsen Memarian\*, Andreas Kassler\*†, Karl-Johan Grinnemo\*, Sándor Laki‡, Gergely Pongrácz§, Johan Forsman¶, Chrysa Papagianni‖**
 
-Mohsen Memarian, Andreas Kassler, Karl-Johan Grinnemo, Sándor Laki, Gergely Pongrácz, Johan Forsman, and Chrysa Papagianni.
+\* Karlstad University, Sweden  
+† Deggendorf Institute of Technology, Germany  
+‡ ELTE Eötvös Loránd University, Hungary  
+§ Ericsson Research, Hungary  
+¶ TietoEvry, Sweden  
+‖ University of Amsterdam, The Netherlands
 
-This repository contains the host-side DPDK workflow, P4/SmartNIC source provenance, TRex traffic profiles, experiment matrices, power-measurement helpers, and analysis scripts used to reproduce the paper's heterogeneous packet-processing evaluation. The 5G gNB user plane is the concrete workload; the broader objective is to study how packet-processing stages should be placed across a programmable SmartNIC and a general-purpose host, and how the residual host workload should be power-managed.
+**Contact:** mohsen.memarian@kau.se, andreas.kassler@kau.se, karlgrin@kau.se, lakis@inf.elte.hu, gergely.pongracz@ericsson.com, johan.forsman@tietoevry.com, c.papagianni@uva.nl
 
-## Artifact scope
+DRI-HeteroPktProc contains the implementation and experiment workflow for the paper **“Energy-Efficient Heterogeneous Packet Processing for Digital Research Infrastructures: SmartNIC Offloading and Adaptive CPU Power Management.”**
 
-The repository is organized around three reproducibility goals:
+Modern networking nodes increasingly combine general-purpose CPUs with programmable SmartNICs or other accelerators. The main question studied in this work is not simply *how much processing can be offloaded*, but **where packet-processing stages should execute and how the remaining host resources should be power-managed**.
 
-1. **Artifact availability:** preserve the implementation sources, source revisions, parameter sets, traffic profiles, and testbed configuration needed to reconstruct the evaluated system.
-2. **Artifact functionality:** provide machine-checkable scripts and command generators for the DPDK, TRex, daily-profile, and analysis paths.
-3. **Result reproduction:** map the experiment inputs to the figures and tables in the paper and document the measurement boundaries needed to compare reproduced results correctly.
+We study this problem using a 5G gNB user-plane pipeline as a concrete heterogeneous networking workload. P4-programmable SmartNICs execute selected parsing, lookup, header-processing, forwarding, and cloning operations, while a DPDK-enabled x86 host executes the remaining software stages and packet buffering. We evaluate both complete-flow placement and finer-grained function placement, and combine them with adaptive CPU P-state and C-state control on the host.
 
-The hardware-specific toolchains themselves are not redistributed here. DPDK 20.08, TRex v3.04, the Netronome SDK/P4 toolchain, and Intel SoC Watch must be installed separately on compatible systems.
+The main evaluated dimensions are:
 
-## Repository structure
+- **flow-based offloading:** complete flows are assigned to either the SmartNIC or the host;
+- **function-based partitioning:** the processing boundary is moved between stages of the gNB pipeline;
+- **host execution:** DPDK busy waiting (`BW`) versus adaptive power-aware execution (`PA`);
+- **performance:** throughput, required CPU cores, and round-trip delay percentiles;
+- **power and energy:** host ACPI-domain power, SmartNIC power, CPU frequency, and non-idle energy;
+- **time-varying operation:** independent hourly measurements are combined to reconstruct a 24-hour workload.
+
+For 128-byte traffic, the best function-based placements reach **108.5 MPPS in downlink** and **110.5 MPPS in uplink**. The selected DL/UL function splits reduce the measured 99.9th-percentile round-trip delay by about **70% compared with full host processing under busy waiting**, while the power-aware host configuration reduces **ACPI-domain non-idle energy by up to 59%** in the reconstructed 24-hour analysis.
+
+---
+
+## System overview
 
 ```text
-DRI-HeteroPktProc/
-├── dpdk/                 Host gNB implementation preparation and PA/BW configuration
-├── p4/                   P4 source provenance and function-split definitions
-├── smartnic/             Netronome setup notes and five-card inventory template
-├── traffic/              Configurable TRex STL profile and command generator
-├── experiments/          Flow, function, latency, and 24-hour experiment matrices
-├── measurement/          ACPI/RAPL helpers and measurement-boundary documentation
-├── analysis/             Daily non-idle energy reconstruction
-├── data/                 Daily-profile inputs and result-data layout
-├── EnergyTracer/         EnergyTracer project information and retained tooling path
-├── docs/                 Testbed, expected results, and reproduction checklist
-└── scripts/              Source import, DPDK preparation, and artifact checks
+                          +--------------------------+
+                          |      TRex generator      |
+                          |  ConnectX-5 / TRex 3.04  |
+                          +------------+-------------+
+                                       |
+                                    100 GbE
+                                       |
+                          +------------v-------------+
+                          |     Arista 100G switch    |
+                          +------------+-------------+
+                                       |
+                    +------------------+------------------+
+                    |                                     |
+          +---------v-------------------------------------v---------+
+          |          5 x Netronome Agilio CX SmartNICs             |
+          |     P4 parsing / lookup / protocol stages / steering    |
+          +---------------------------+------------------------------+
+                                      |
+                              PCIe / SR-IOV VFs
+                                      |
+          +---------------------------v------------------------------+
+          |                    x86 DPDK host                         |
+          |   remaining gNB stages + buffering + CPU power control  |
+          +----------------------------------------------------------+
 ```
 
-## Quick start
+The processing boundary is configurable. A packet can remain on the SmartNIC, be sent to the host for the full software pipeline, or cross between the two at an intermediate function boundary. The host power manager then adapts CPU frequency and idle behavior to the residual workload created by that placement.
 
-Clone the repository and first verify the self-contained artifact files:
+---
+
+## Repository layout
+
+| Path | Purpose |
+|---|---|
+| `dpdk/` | Host gNB application, busy-wait/power-aware preparation, and paper power parameters |
+| `p4/` | P4 source import, SmartNIC processing description, and DL/UL split definitions |
+| `smartnic/` | Netronome setup notes and five-SmartNIC testbed configuration template |
+| `traffic/` | TRex STL profile for DL/UL traffic, flow tags, packet sizes, IMIX, and latency probes |
+| `experiments/` | Flow-based, function-based, latency, and daily operating-point matrices |
+| `measurement/` | Host/SmartNIC measurement notes and ACPI/RAPL helper scripts |
+| `analysis/` | Reconstruction of daily non-idle energy from independently measured operating points |
+| `data/` | Hourly-profile inputs and layout for measured/processed data |
+| `EnergyTracer/` | EnergyTracer project information and tracing workflow used alongside the DPDK implementation |
+| `docs/` | Testbed description, expected paper results, and full reproduction checklist |
+| `scripts/` | Pinned source import, DPDK preparation, and repository checks |
+
+The exact source revisions imported from the earlier EnergyTracer and IFIP implementations are recorded in [`sources.lock`](sources.lock).
+
+---
+
+## Getting started
+
+Clone the repository:
 
 ```bash
 git clone https://github.com/Meamarian/DRI-HeteroPktProc.git
 cd DRI-HeteroPktProc
+```
+
+Check the repository scripts and configuration files:
+
+```bash
 make check
 ```
 
-Fetch the pinned source material from the two earlier implementation repositories and prepare the paper DPDK variants:
+Fetch the pinned implementation sources:
 
 ```bash
 make fetch
+```
+
+This imports the source files used as the basis of the paper implementation and prepares the DPDK variants. In particular, it creates:
+
+```text
+dpdk/upstream/gNB_power_aware.c
+dpdk/src/power_aware/main.c
+dpdk/src/busy_wait/main.c
+p4/upstream/main.p4
+p4/upstream/main_clone.p4
+p4/upstream/base.p4cfg
+p4/upstream/p4_cfg_generator.py
+smartnic/upstream/...
+traffic/upstream/...
+EnergyTracer/tools/...
+```
+
+If the DPDK source has already been fetched and only the paper power configuration has changed, regenerate the host variants with:
+
+```bash
 make dpdk
 ```
 
-The pinned source revisions are recorded in `sources.lock`. The fetch step imports the EnergyTracer DPDK application and the P4, SmartNIC, configuration, and reference TRex files from the earlier IFIP implementation. `scripts/prepare_dpdk.py` then produces the paper-aligned power-aware and busy-wait DPDK variants.
+The generated `power_aware` and `busy_wait` versions use the same gNB packet-processing path; the intended difference is the CPU power-management behavior.
 
-Generate TRex commands for an experiment matrix, for example the downlink flow-based evaluation:
+---
 
-```bash
-python3 traffic/run_matrix.py experiments/flow/dl.csv
+## Paper testbed
+
+The reported Device Under Test uses:
+
+| Component | Paper configuration |
+|---|---|
+| Host CPU | 2 x Intel Xeon Gold 5418Y, 24 physical cores per socket |
+| Memory | 256 GB DDR5 |
+| SmartNICs | 5 x Netronome Agilio CX 2x40 G |
+| SmartNIC processing | 60 micro-engine cores per card at 800 MHz |
+| Host OS | Ubuntu 18.04 with HWE kernel |
+| DPDK | 20.08 |
+| Traffic generator | TRex v3.04 |
+| TG NICs | 2 x Mellanox ConnectX-5 dual-port 100 G |
+| Network | Arista 100 G switch |
+| Uncore frequency | fixed at 1.4 GHz |
+
+The five SmartNICs are distributed across the two NUMA domains. DPDK workers are pinned to CPU cores local to the corresponding SmartNICs, and packet buffers use NUMA-local hugepages.
+
+The exact paper hardware is not required to inspect the implementation or generate the experiment commands, but comparable performance and power results require a platform with equivalent capabilities and careful CPU/NUMA placement.
+
+See [`docs/testbed.md`](docs/testbed.md) and [`smartnic/README.md`](smartnic/README.md) before configuring the DUT.
+
+---
+
+## 1. Prepare the DPDK host application
+
+The host implementation starts from the EnergyTracer `gNB_power_aware.c` application and the DPDK `l3fwd-power` example.
+
+After `make fetch`, choose one generated variant:
+
+```text
+dpdk/src/power_aware/main.c
+dpdk/src/busy_wait/main.c
 ```
 
-Detailed setup and measurement instructions are in `docs/reproduction.md`.
+A clean DPDK 20.08 tree is required because the application uses the `l3fwd-power` support files and power-management interfaces from that release. Copy the selected variant into the DPDK example tree:
 
-## Paper-to-artifact map
+```bash
+cp dpdk/src/power_aware/main.c <DPDK-20.08>/examples/l3fwd-power/main.c
+```
 
-| Paper evaluation | Artifact entry point | Main configuration |
-| --- | --- | --- |
-| Fig. 3 — DL flow-based offloading | `experiments/flow/dl.csv` | SmartNIC-SA; 30/50/70/100% host offload |
-| Fig. 4 — DL function-based partitioning | `experiments/function/dl.csv` | DL Split-0 through Split-4 |
-| Fig. 5 — UL flow-based offloading | `experiments/flow/ul.csv` | SmartNIC-SA; 30/50/70/100% host offload |
-| Fig. 6 — UL function-based partitioning | `experiments/function/ul.csv` | UL Split-0 through Split-3 |
-| Fig. 7 — RTD percentile analysis | `experiments/latency/latency.csv` | 50 kpps latency probes |
-| Fig. 8 — 24 h load and CPU demand | `experiments/daily/`, `data/daily/` | DL Split-3; UL Split-2 |
-| Figs. 9–10 — hourly non-idle energy | `experiments/daily/`, `measurement/` | BW versus PA |
-| Tables 4–5 — daily savings | `analysis/reconstruct_daily.py` | independent hourly operating points |
+or:
 
-Reference values reported in the manuscript are summarized in `docs/expected_results.md` so reproduced runs can be checked against the corresponding paper claims.
+```bash
+cp dpdk/src/busy_wait/main.c <DPDK-20.08>/examples/l3fwd-power/main.c
+```
 
-## Experimental platform
+Keep `main.h`, `perf_core.c`, and `perf_core.h` from the same DPDK 20.08 `l3fwd-power` example and build with the DPDK 20.08 toolchain.
 
-The reported DUT is a dual-socket server with:
+The gNB table configuration is selected at runtime through:
 
-- two Intel Xeon Gold 5418Y processors;
-- 24 physical cores per socket, 48 physical cores total;
-- 256 GB DDR5 RAM;
-- five Netronome Agilio CX 2x40 G SmartNICs;
-- 60 SmartNIC micro-engine cores per card at 800 MHz;
-- Ubuntu 18.04 with an HWE kernel;
-- DPDK 20.08.
+```bash
+export GNB_CONFIG=/path/to/config_table.json
+```
 
-The SmartNICs are distributed across both NUMA domains. DPDK workers are pinned to CPU cores local to their SmartNICs, packet buffers use NUMA-local hugepages, and the uncore frequency is fixed at 1.4 GHz in the reported measurements.
+The imported P4 configuration generator under `p4/upstream/` can be used as the starting point for the 64k-entry DRB/TEID table.
 
-Traffic is generated on a separate x86 server using TRex v3.04 and two Mellanox ConnectX-5 dual-port 100 G NICs. An Arista 100 G switch distributes traffic to the five SmartNICs using static MAC-based forwarding rules.
+Full host-side instructions are in [`dpdk/README.md`](dpdk/README.md).
 
-See `docs/testbed.md` for the testbed checklist.
+### Power-aware parameters
 
-## Heterogeneous processing model
-
-The implementation supports two placement mechanisms.
-
-**Flow-based offloading** assigns complete flows either to the SmartNIC path or to the host path. The IPv4 Identification field carries the offload tag used by the experiment traffic generator.
-
-**Function-based partitioning** moves the processing boundary within the packet-processing pipeline. The evaluated split points are:
-
-### Downlink
-
-| Split | SmartNIC processing | Host processing |
-| --- | --- | --- |
-| Split-0 | parsing, offload decision, VF steering | complete gNB processing chain |
-| Split-1 | Split-0 + GTP-U decapsulation | remaining DL processing |
-| Split-2 | Split-1 + DRB lookup | SDAP/PDCP/RLC insertion, cloning, saving |
-| Split-3 | Split-2 + SDAP/PDCP/RLC insertion | cloning and saving |
-| Split-4 | Split-3 + cloning | packet storage |
-
-### Uplink
-
-| Split | SmartNIC processing | Host processing |
-| --- | --- | --- |
-| Split-0 | parsing, offload decision, VF steering | complete UL processing chain |
-| Split-1 | Split-0 + RLC/PDCP/SDAP removal | DRB lookup and GTP-U encapsulation |
-| Split-2 | Split-1 + DRB lookup | GTP-U encapsulation |
-| Split-3 | Split-2 + GTP-U encapsulation | none |
-
-The full split definitions are in `p4/SPLITS.md`.
-
-## DPDK power management
-
-The paper compares busy-wait execution (`BW`) with a power-aware DPDK path (`PA`). The PA path combines per-poll idle/frequency decisions with a periodic frequency-down callback. The exact parameter set is stored in `dpdk/config/power-paper.conf`:
+The paper configuration is stored in [`dpdk/config/power-paper.conf`](dpdk/config/power-paper.conf):
 
 | Parameter | Value |
-| --- | ---: |
+|---|---:|
 | `MIN_EMPTY_POLL_COUNT` | 10 polls |
 | `PAUSE_THRESHOLD` | 10 us |
 | `GO_TO_SLEEP_THRESHOLD` | 300 polls |
@@ -144,85 +211,194 @@ The paper compares busy-wait execution (`BW`) with a power-aware DPDK path (`PA`
 | `SCALING_DOWN_SLEEP_RATIO_THR` | 0.25 |
 | `MAX_PKT_BURST` | 32 packets |
 
-The host implementation is prepared from the pinned EnergyTracer `gNB_power_aware.c` source. `dpdk/README.md` describes how the paper-aligned PA and BW variants are generated and built against DPDK 20.08.
+---
 
-## TRex traffic generation
+## 2. Prepare the P4 / SmartNIC path
 
-`traffic/trex_gnb_profile.py` provides a single STL profile for the paper operating points. It supports:
+The P4 implementation is imported from the earlier hybrid gNB implementation at the pinned revision in `sources.lock`.
 
-- DL GTP-U packet templates;
-- UL RLC/PDCP/SDAP packet templates;
-- up to 64k UE/TEID values;
-- controlled MPPS rates;
-- flow-based SmartNIC/host assignment;
-- fixed-size and IMIX traffic;
-- 50 kpps latency probes.
+After `make fetch`:
 
-Unless stated otherwise, the controlled experiments use 128-byte packets. The standard offered-load points are 7, 21, 35, 49, 63, 77, and 100 MPPS. SmartNIC-only latency measurements use 7, 21, and 35 MPPS to stay below the reported saturation point.
-
-The paper records each steady-state power operating point over a 20 s window after warm-up. The exact warm-up used on a reproduction platform should be logged together with the run metadata.
-
-See `traffic/README.md` and `experiments/README.md`.
-
-## Reconstructing the 24-hour analysis
-
-The 24-hour evaluation is **not** one continuous 24-hour TRex run. Each hourly load is represented by an independent one-minute TRex operating point and is weighted afterward by the corresponding hourly traffic volume. This is important for reproducing the paper correctly.
-
-The daily evaluation uses:
-
-- DL Split-3;
-- UL Split-2;
-- 128 B packets;
-- IMIX: 58.33% 64 B, 33.33% 590 B, 8.33% 1514 B;
-- 590 B packets;
-- 1518 B packets.
-
-`experiments/daily/make_runs.py` converts a completed hourly profile CSV into the required TRex commands. `data/daily/hourly_profile_template.csv` intentionally leaves the 24 hourly MPPS values blank: the manuscript describes the source profile and reconstruction method but does not provide the complete numerical hourly table. Exact archived experiment values or the original traffic dataset should be used rather than values digitized from the figure.
-
-For mixed-direction reconstruction, `data/daily/ul_dl_profiles.csv` contains the four UL/DL ratios reported in the paper.
-
-After collecting the independently measured hourly BW and PA values, run:
-
-```bash
-python3 analysis/reconstruct_daily.py hourly_results.csv
+```text
+p4/upstream/main.p4
+p4/upstream/main_clone.p4
+p4/upstream/base.p4cfg
+p4/upstream/p4_cfg_generator.py
 ```
 
-The analysis reports the accumulated non-idle energy saving and the relative reduction against BW.
+`main.p4` contains the common gNB parser, TEID/DRB table logic, host-VF steering, and DL/UL protocol actions. `main_clone.p4` contains the SmartNIC cloning path used by the DL cloning case.
+
+The evaluated placement boundaries are documented in [`p4/SPLITS.md`](p4/SPLITS.md). The original public IFIP source does not contain a separate archived P4 source for every journal-paper split, so this repository keeps the available implementation unchanged and documents the exact split semantics rather than creating unverified split-specific P4 programs.
+
+The original Netronome setup scripts are imported under `smartnic/upstream/`. They contain lab-specific PCI addresses and SDK paths and should be reviewed before use on another system. [`smartnic/testbed.env.example`](smartnic/testbed.env.example) provides a neutral five-card inventory template.
+
+---
+
+## 3. Generate traffic with TRex
+
+The paper uses TRex v3.04 on a separate traffic-generator server. [`traffic/trex_gnb_profile.py`](traffic/trex_gnb_profile.py) provides the common profile used to generate the paper operating points.
+
+It supports:
+
+- DL GTP-U traffic;
+- UL RLC/PDCP/SDAP traffic;
+- up to 64k UE/TEID values;
+- flow-based SmartNIC/host assignment through the outer IPv4 Identification field;
+- fixed-size packets and IMIX;
+- controlled MPPS rates;
+- dedicated 50 kpps latency probes.
+
+Example from the TRex console:
+
+```text
+start -f traffic/trex_gnb_profile.py -p 0 -d 30 -t --direction dl --mpps 21 --pktsize 128 --offload 50
+```
+
+Generate all commands for one experiment matrix with:
+
+```bash
+python3 traffic/run_matrix.py experiments/flow/dl.csv
+```
+
+The standard offered-load points are **7, 21, 35, 49, 63, 77, and 100 MPPS**. Unless stated otherwise, the paper uses **128-byte packets**.
+
+See [`traffic/README.md`](traffic/README.md) for the profile options and [`experiments/README.md`](experiments/README.md) for the complete operating-point matrices.
+
+---
+
+## 4. Select the processing placement
+
+### Flow-based offloading
+
+Complete flows are assigned either to the SmartNIC path or to the host path. The traffic generator carries the offload tag in the outer IPv4 Identification field. The paper evaluates SmartNIC stand-alone processing and **30%, 50%, 70%, and 100% host offload**.
+
+### Function-based partitioning
+
+The processing boundary is moved inside the packet-processing pipeline.
+
+#### Downlink
+
+| Split | SmartNIC | Host |
+|---|---|---|
+| Split-0 | parsing, offload decision, VF steering | complete gNB processing chain |
+| Split-1 | Split-0 + GTP-U decapsulation | remaining DL processing |
+| Split-2 | Split-1 + DRB lookup | SDAP/PDCP/RLC insertion, cloning, saving |
+| Split-3 | Split-2 + SDAP/PDCP/RLC insertion | cloning and saving |
+| Split-4 | Split-3 + cloning | packet storage |
+
+#### Uplink
+
+| Split | SmartNIC | Host |
+|---|---|---|
+| Split-0 | parsing, offload decision, VF steering | complete UL processing chain |
+| Split-1 | Split-0 + RLC/PDCP/SDAP removal | DRB lookup and GTP-U encapsulation |
+| Split-2 | Split-1 + DRB lookup | GTP-U encapsulation |
+| Split-3 | Split-2 + GTP-U encapsulation | none |
+
+The main daily evaluation uses **DL Split-3** and **UL Split-2**, the highest-throughput function placements found in the paper.
+
+---
+
+## 5. Run the paper experiments
+
+The CSV files under `experiments/` define the controlled operating points without embedding testbed-specific commands.
+
+| Paper result | Experiment input | Configuration |
+|---|---|---|
+| DL flow-based offloading | `experiments/flow/dl.csv` | SmartNIC-SA; 30/50/70/100% host offload |
+| DL function-based partitioning | `experiments/function/dl.csv` | Split-0 to Split-4; BW and PA |
+| UL flow-based offloading | `experiments/flow/ul.csv` | SmartNIC-SA; 30/50/70/100% host offload |
+| UL function-based partitioning | `experiments/function/ul.csv` | Split-0 to Split-3; BW and PA |
+| RTD percentile analysis | `experiments/latency/latency.csv` | 50 kpps latency probes |
+| 24-hour load reconstruction | `experiments/daily/`, `data/daily/` | DL Split-3; UL Split-2 |
+| Daily energy calculation | `analysis/reconstruct_daily.py` | independently measured hourly BW/PA values |
+
+Reference values from the paper are collected in [`docs/expected_results.md`](docs/expected_results.md).
+
+For the steady-state power experiments, bring TRex to the target load, allow the system to stabilize, and measure power over the **20 s window** used in the paper. Record the actual warm-up period with the experiment metadata.
+
+---
+
+## Latency measurements
+
+Latency is measured using dedicated **50 kpps** TRex probes. The reported value is **round-trip delay (RTD)** from the traffic-generator host through the DUT and back; it is not one-way gNB processing latency.
+
+The SmartNIC-only DL case is measured at 7, 21, and 35 MPPS to stay below its saturation point. The host and selected hybrid cases use the operating points defined in [`experiments/latency/latency.csv`](experiments/latency/latency.csv).
+
+The selected busy-wait function placements, DL Split-3 and UL Split-2, reach a Q99.9 of approximately **182 us** at full rate, compared with approximately **601 us** for full host processing.
+
+---
 
 ## Power measurement
 
 The paper uses three measurement levels:
 
-- corrected PDU outlet power at 1 Hz;
-- aggregate ACPI-domain power at 1 Hz;
-- CPU package/DRAM power and CPU frequency using Intel SoC Watch 2024.6.0 at 100 ms, together with per-card SmartNIC power at 1 Hz using the Netronome SDK.
+1. **System power:** Supermicro ECO PDU outlet, sampled at 1 Hz and corrected using the PSU efficiency curve.
+2. **Server/ACPI domain:** aggregate on-board ACPI power at 1 Hz.
+3. **Components:** CPU package power, DRAM power, and CPU frequency with Intel SoC Watch 2024.6.0 at 100 ms; SmartNIC power at 1 Hz per card using the Netronome SDK.
 
-`measurement/tools/acpi.sh` and `measurement/tools/msr.py` are retained from the GreenQUIC experimental tooling. `acpi.sh` is useful for the 1 Hz board/ACPI sensor path when the platform exposes the corresponding `power1` sensor. `msr.py` provides a lightweight Intel RAPL package/DRAM sampling path for diagnostics and cross-checking; it is **not** a replacement for the SoC Watch measurements reported in this paper.
+The ACPI domain includes host processing and shared resources such as uncore, LLC, memory-controller and PCIe activity, as well as mapped SmartNIC devices. **ACPI and SmartNIC measurements overlap and must not be added as independent power components.**
 
-The ACPI and SmartNIC domains overlap and must not be added as independent power components. See `measurement/README.md` and `docs/measurement.md`.
+[`measurement/tools/acpi.sh`](measurement/tools/acpi.sh) and [`measurement/tools/msr.py`](measurement/tools/msr.py) are retained from the GreenQUIC measurement workflow. `acpi.sh` samples the platform `power1` sensor when exposed by the system. `msr.py` provides a lightweight Intel RAPL package/DRAM measurement path for diagnostics and cross-checking; the paper's reported package/DRAM/frequency measurements use SoC Watch.
+
+See [`docs/measurement.md`](docs/measurement.md) for the measurement boundaries.
+
+---
+
+## Reconstructing the 24-hour workload
+
+The 24-hour result is **not a continuous 24-hour TRex replay**. Each hourly traffic level is represented by an independent **one-minute TRex run**. The measured operating points are then weighted by the corresponding hourly traffic volumes.
+
+The daily evaluation uses:
+
+- DL Split-3 and UL Split-2;
+- 128 B packets;
+- IMIX: 58.33% 64 B, 33.33% 590 B, and 8.33% 1514 B;
+- 590 B packets;
+- 1518 B packets.
+
+The four UL/DL traffic-ratio profiles reported in the paper are stored in [`data/daily/ul_dl_profiles.csv`](data/daily/ul_dl_profiles.csv).
+
+[`data/daily/hourly_profile_template.csv`](data/daily/hourly_profile_template.csv) intentionally leaves the 24 hourly MPPS values empty. The paper describes the source traffic profile and reconstruction method but does not publish the complete numerical hourly series. Exact archived values or the original source dataset should be used instead of digitizing values from the plot.
+
+Once the hourly values are available, generate the one-minute runs with:
+
+```bash
+python3 experiments/daily/make_runs.py data/daily/hourly_profile.csv
+```
+
+After collecting the independently measured BW and PA values, reconstruct the daily non-idle energy with:
+
+```bash
+python3 analysis/reconstruct_daily.py hourly_results.csv
+```
+
+The reported percentage savings refer to **energy above the measured idle baseline**, not to total server, facility, or lifecycle energy. The paper's idle ACPI baseline is approximately **255–258 W**.
+
+---
 
 ## EnergyTracer
 
-`EnergyTracer/` documents the EnergyTracer framework and the provenance of the DPDK application used as the starting point for the host implementation. EnergyTracer correlates DPDK dataplane events, Linux CPU power-state activity, and hardware energy measurements on a synchronized timeline.
+The [`EnergyTracer/`](EnergyTracer/) directory documents the EnergyTracer framework used alongside the DPDK implementation.
 
-The original project is available at `Meamarian/EnergyTracer`. The pinned revision used by this artifact is recorded in `sources.lock`.
+EnergyTracer correlates DPDK dataplane events with Linux CPU power-state activity and hardware energy measurements on a common timeline. Its tracing tools are kept separate from the main TRex operating-point workflow used for the throughput, latency, and 24-hour results in this paper.
 
-## Reproducibility notes
+Original project: [Meamarian/EnergyTracer](https://github.com/Meamarian/EnergyTracer)
 
-For every run, record at least the repository revision, P4 placement, DPDK mode, CPU/lcore map, NUMA placement, hugepage configuration, packet profile, offered rate, UE count, warm-up interval, measurement interval, TRex TX/RX/drop counters, and measurement filenames. `docs/reproduction.md` provides the complete checklist.
+---
 
-Large raw measurement files are not committed by default. If the archived raw dataset is published separately, record its immutable identifier in `data/README.md` and keep the processed tables required for the paper figures under `data/processed/`.
+## Source repositories
 
-## Source provenance
+This repository builds on source material from three earlier projects:
 
-The artifact builds on three existing project sources:
-
-- `Meamarian/EnergyTracer` — DPDK gNB/power-aware implementation and EnergyTracer tools;
-- `Meamarian/Hybrid_P4_IFIP_WMNC_24` — P4/SmartNIC implementation, Netronome setup material, configuration generation, and reference TRex packet templates;
+- [Meamarian/EnergyTracer](https://github.com/Meamarian/EnergyTracer) — DPDK gNB/power-aware implementation and EnergyTracer tools;
+- [Meamarian/Hybrid_P4_IFIP_WMNC_24](https://github.com/Meamarian/Hybrid_P4_IFIP_WMNC_24) — P4/SmartNIC implementation, Netronome setup material, configuration generation, and reference TRex templates;
 - `Meamarian/GreenQUIC` — ACPI and Intel RAPL measurement helpers.
 
-All source revisions are pinned in `sources.lock`. Imported or derived files retain their original copyright and license notices where applicable. See `NOTICE.md`.
+The exact revisions are pinned in [`sources.lock`](sources.lock). Imported or derived source files retain their original copyright and license notices where applicable. See [`NOTICE.md`](NOTICE.md).
+
+---
 
 ## Citation
 
-A machine-readable citation is provided in `CITATION.cff`.
+Citation metadata is provided in [`CITATION.cff`](CITATION.cff).
