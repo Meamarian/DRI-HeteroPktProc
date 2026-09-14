@@ -7,7 +7,7 @@ The evaluation uses three measurement levels so power can be viewed at system, s
 - **System power:** Supermicro ECO PDU outlet at 1 Hz, corrected with the PSU efficiency curve.
 - **Server/ACPI domain:** aggregate on-board ACPI power at 1 Hz.
 - **CPU and memory:** Intel SoC Watch 2024.6.0 at 100 ms for package power, DRAM power, and average CPU frequency.
-- **SmartNICs:** Netronome SDK power readings at 1 Hz per card, summed across the five SmartNICs.
+- **SmartNICs:** Netronome SDK power readings at 1 Hz per card,  summed across the five SmartNICs.
 
 The ACPI domain includes active CPU cores together with shared host resources such as uncore, LLC, memory controller, PCIe activity, and mapped SmartNIC devices. Report ACPI and SmartNIC values as separate, overlapping measurement domains.
 
