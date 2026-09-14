@@ -15,6 +15,7 @@ REQUIRED = [
     "traffic/trex_gnb_profile.py",
     "traffic/experiment_sweep.py",
     "measurement/README.md",
+    "measurement/tuning/power_alg_thr_tunning.xlsx",
     "measurement/tools/acpi.sh",
     "measurement/tools/msr.py",
     "EnergyTracer/README.md",
