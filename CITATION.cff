@@ -1,0 +1,40 @@
+cff-version: 1.2.0
+title: DRI-HeteroPktProc
+message: If you use this software, please cite the accompanying paper.
+type: software
+authors:
+  - family-names: Memarian
+    given-names: Mohsen
+  - family-names: Kassler
+    given-names: Andreas
+  - family-names: Grinnemo
+    given-names: Karl-Johan
+  - family-names: Laki
+    given-names: Sándor
+  - family-names: Pongrácz
+    given-names: Gergely
+  - family-names: Forsman
+    given-names: Johan
+  - family-names: Papagianni
+    given-names: Chrysa
+repository-code: https://github.com/Meamarian/DRI-HeteroPktProc
+preferred-citation:
+  type: article
+  title: "Energy-Efficient Heterogeneous Packet Processing for Digital Research Infrastructures: SmartNIC Offloading and Adaptive CPU Power Management"
+  authors:
+    - family-names: Memarian
+      given-names: Mohsen
+    - family-names: Kassler
+      given-names: Andreas
+    - family-names: Grinnemo
+      given-names: Karl-Johan
+    - family-names: Laki
+      given-names: Sándor
+    - family-names: Pongrácz
+      given-names: Gergely
+    - family-names: Forsman
+      given-names: Johan
+    - family-names: Papagianni
+      given-names: Chrysa
+  journal: Computer Communications
+  year: 2026
