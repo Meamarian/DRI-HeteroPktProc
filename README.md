@@ -33,7 +33,6 @@ On the five-SmartNIC testbed, the best function-based placements reach **108.5 M
 | `p4/` | P4 processing code and DL/UL function-split definitions |
 | `smartnic/` | Netronome setup notes and five-SmartNIC testbed template |
 | `traffic/` | TRex packet profiles and Python experiment sweeps |
-| `experiments/` | Experiment order and DUT-side placement notes |
 | `measurement/` | ACPI/RAPL helpers and power-measurement instructions |
 | `EnergyTracer/` | EnergyTracer tools used with the DPDK implementation |
 | `scripts/` | Source preparation and repository checks |
