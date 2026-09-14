@@ -1,6 +1,6 @@
 # SmartNIC setup
 
-The paper testbed uses five Netronome Agilio CX 2x40 G SmartNICs.
+The paper testbed uses five Netronome Agilio CX 2x40 G  SmartNICs.
 
 Use [`testbed.env.example`](testbed.env.example) to record the local PF addresses, RTE ports, SDK path, and VF count for the five cards. The setup files under `smartnic/upstream/` can then be adapted to those local values.
 
