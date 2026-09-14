@@ -4,7 +4,7 @@ This directory contains the EnergyTracer tools used with the DPDK implementation
 
 EnergyTracer is a cross-layer observability framework for DPDK packet-processing systems. It aligns DPDK dataplane events, Linux CPU power-state activity, and hardware energy measurements on a common timeline.
 
-The framework is described in:
+The framework is described in :
 
 **EnergyTracer: Energy Analysis of Packet Processing Events in DPDK-Based Applications**
 
