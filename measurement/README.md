@@ -11,6 +11,12 @@ The evaluation uses three measurement levels so power can be viewed at system, s
 
 The ACPI domain includes active CPU cores together with shared host resources such as uncore, LLC, memory controller, PCIe activity, and mapped SmartNIC devices. Report ACPI and SmartNIC values as separate, overlapping measurement domains.
 
+## Power-management threshold tuning
+
+The DPDK power controller was tuned by sweeping the parameters that control RX batching, queue-pressure frequency increases, empty-poll idle entry, and periodic frequency down-scaling. Each parameter was explored from low and high extremes with midpoint refinement, followed by combined tests of the strongest candidates. Candidate selection prioritizes throughput first, then power, and then Q99.9 round-trip delay.
+
+The tuning workbook is `measurement/tuning/power_alg_thr_tunning.xlsx`. It contains separate DL and UL threshold sweeps, combined-threshold tests, and the traffic and CPU conditions used for the estimates. The final parameter values used by the implementation are listed in `dpdk/config/power-paper.conf`.
+
 ## Helper scripts
 
 `tools/acpi.sh` and `tools/msr.py` provide lightweight command-line measurements for the host.
