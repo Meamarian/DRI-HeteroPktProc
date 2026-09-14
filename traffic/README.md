@@ -4,7 +4,7 @@ The experiments use TRex v3.04 on a separate x86 traffic-generator server with t
 
 [`trex_gnb_profile.py`](trex_gnb_profile.py) defines the packet formats and streams used by the paper. It supports DL GTP-U traffic, UL RLC/PDCP/SDAP traffic, UE/TEID variation up to 64k entries, SmartNIC/host path tagging, fixed packet sizes, IMIX, controlled MPPS rates, and 50 kpps latency probes.
 
-A single operating point can be started from the TRex console:
+A single operating point can be started from the  TRex console:
 
 ```text
 start -f traffic/trex_gnb_profile.py -p 0 -d 30 -t --direction dl --mpps 21 --pktsize 128 --offload 50
