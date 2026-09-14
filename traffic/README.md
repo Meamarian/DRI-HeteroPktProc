@@ -2,55 +2,82 @@
 
 The experiments use TRex v3.04 on a separate x86 traffic-generator server with two Mellanox ConnectX-5 dual-port 100 G NICs. Traffic reaches the DUT through an Arista 100 G switch.
 
-[`trex_gnb_profile.py`](trex_gnb_profile.py) is the common STL profile used for the paper operating points. The earlier IFIP TRex scripts can be fetched under `traffic/upstream/` for comparison with the original implementation.
+[`trex_gnb_profile.py`](trex_gnb_profile.py) defines the packet formats and streams used by the paper. It supports DL GTP-U traffic, UL RLC/PDCP/SDAP traffic, UE/TEID variation up to 64k entries, flow-based SmartNIC/host tagging, fixed packet sizes, IMIX, controlled MPPS rates, and the 50 kpps latency probes.
 
-The profile supports:
-
-- DL GTP-U packet generation;
-- UL RLC/PDCP/SDAP packet generation;
-- UE/TEID variation up to 64k entries;
-- flow-based SmartNIC/host tagging;
-- fixed packet sizes and IMIX;
-- controlled MPPS rates;
-- dedicated latency probes.
-
-## Controlled-rate example
-
-From the TRex console:
+A single operating point can be started directly from the TRex console:
 
 ```text
 start -f traffic/trex_gnb_profile.py -p 0 -d 30 -t --direction dl --mpps 21 --pktsize 128 --offload 50
 ```
 
-The steady-state power measurements use a 20 s measurement window after the target load has stabilized. The example above uses a 30 s TRex duration only to leave room for warm-up and measurement. Record the actual warm-up and measurement intervals used on the testbed.
+## Experiment sweep
 
-Generate commands for a matrix with:
+[`experiment_sweep.py`](experiment_sweep.py) keeps the traffic operating points directly in Python lists:
+
+```python
+RATE_POINTS_MPPS = [7, 21, 35, 49, 63, 77, 100]
+FLOW_OFFLOAD_PERCENTAGES = [0, 30, 50, 70, 100]
+DAILY_PACKET_PROFILES = [128, "imix", 590, 1518]
+DIRECTIONS = ["dl", "ul"]
+```
+
+The script executes one operating point at a time and waits 5 s before starting the next one. The default daily sequence is DL first and then UL; within each direction it evaluates packet profiles in the paper order: 128 B, IMIX, 590 B, and 1518 B. Each daily operating point runs for 60 s by default.
+
+Show the sequence without connecting to TRex:
 
 ```bash
-python3 traffic/run_matrix.py experiments/flow/dl.csv --duration 30
+python3 traffic/experiment_sweep.py --suite daily --dry-run
+```
+
+Run the sequence against a TRex server:
+
+```bash
+python3 traffic/experiment_sweep.py --suite daily --server 127.0.0.1 --port 0
+```
+
+The 5 s inter-run gap can be changed with `--gap`. The run duration can be changed with `--duration`.
+
+For the short steady-state experiments, a 30 s traffic run leaves time for stabilization and the 20 s measurement window used in the paper:
+
+```bash
+python3 traffic/experiment_sweep.py --suite rate --direction dl --duration 30 --gap 5
 ```
 
 ## Flow-based assignment
 
-`--offload` controls the share of traffic sent to the host path. The profile creates host-tagged and SmartNIC-tagged streams in the requested ratio, using the outer IPv4 Identification field as the offload tag.
+`--offload` controls the share of traffic sent to the host path. The outer IPv4 Identification field carries the path tag.
 
-For example, `--offload 30` sends 30% of the configured packet rate on the host-tagged path and 70% on the SmartNIC path.
+The full flow sweep uses 0%, 30%, 50%, 70%, and 100% host offload:
 
-## Latency probes
+```bash
+python3 traffic/experiment_sweep.py --suite flow --direction dl --duration 30 --gap 5
+```
 
-Use `--latency` to add the dedicated 50 kpps latency stream used in the RTD measurements. The SmartNIC-only DL reference is evaluated at 7, 21, and 35 MPPS. Host-only and selected hybrid placements use the operating points listed in `experiments/latency/latency.csv`.
+## Function-based placement
 
-The reported latency is round-trip delay between the TRex host and the DUT, not one-way gNB processing latency.
+Function placement is configured on the SmartNIC/DPDK side, not by the traffic generator. After selecting a DL or UL split on the DUT, run the normal rate sweep with the corresponding direction. This keeps traffic generation independent from the processing placement being evaluated.
 
-## Daily measurements
+## Latency
 
-The daily analysis does not replay a continuous 24-hour trace. Each hourly traffic level is measured as an independent one-minute operating point. `../experiments/daily/make_runs.py` turns a completed hourly profile CSV into the required TRex commands.
+Use the latency suite to add the dedicated 50 kpps probe stream:
 
-Packet profiles used in the daily evaluation:
+```bash
+python3 traffic/experiment_sweep.py --suite latency --direction dl --rates 7 21 35 --duration 30 --gap 5
+```
 
-- 128 B;
-- IMIX: 58.33% 64 B, 33.33% 590 B, 8.33% 1514 B;
-- 590 B;
-- 1518 B.
+The reported value is round-trip delay between the TRex host and the DUT, not one-way gNB processing latency.
+
+## Time-varying evaluation
+
+The 24-hour analysis in the paper is reconstructed from independent operating-point measurements; it is not a continuous 24-hour replay. Each hourly load is represented by a one-minute TRex run and later weighted by the corresponding hourly traffic volume.
+
+The repository therefore keeps the measurement points as Python lists rather than encoding a synthetic day-long curve. If the exact archived hourly rates are available, they can be passed directly with `--rates` or placed in the Python rate list before running the sequence.
+
+The packet-size order used for the daily measurements is:
+
+1. 128 B
+2. IMIX: 58.33% 64 B, 33.33% 590 B, 8.33% 1514 B
+3. 590 B
+4. 1518 B
 
 The daily evaluation uses DL Split-3 and UL Split-2.
