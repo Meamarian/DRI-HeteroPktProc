@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+*.o
+build/
+results/
+data/raw/
+*.log
+*.pcap
+*.pcapng
+*.sqlite
