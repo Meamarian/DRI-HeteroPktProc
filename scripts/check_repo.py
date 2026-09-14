@@ -14,7 +14,6 @@ REQUIRED = [
     "traffic/README.md",
     "traffic/trex_gnb_profile.py",
     "traffic/experiment_sweep.py",
-    "experiments/README.md",
     "measurement/README.md",
     "measurement/tools/acpi.sh",
     "measurement/tools/msr.py",
