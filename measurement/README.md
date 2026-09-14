@@ -13,9 +13,9 @@ The ACPI domain includes active CPU cores together with shared host resources su
 
 ## Power-management threshold tuning
 
-The DPDK power controller was tuned by sweeping the parameters that control RX batching, queue-pressure frequency increases, empty-poll idle entry, and periodic frequency down-scaling. Each parameter was explored from low and high extremes with midpoint refinement, followed by combined tests of the strongest candidates. Candidate selection prioritizes throughput first, then power, and then Q99.9 round-trip delay.
+The power controller was tuned by sweeping each threshold from deliberately wide low and high bounds and then narrowing the range with midpoint tests. The sweep covers RX batching, queue-driven frequency increases, empty-poll idle entry, and periodic frequency down-scaling. Promising settings were then combined, with throughput used as the primary selection criterion, followed by power and Q99.9 round-trip delay.
 
-The tuning workbook is `measurement/tuning/power_alg_thr_tunning.xlsx`. It contains separate DL and UL threshold sweeps, combined-threshold tests, and the traffic and CPU conditions used for the estimates. The final parameter values used by the implementation are listed in `dpdk/config/power-paper.conf`.
+The complete tuning sheet is [`tuning/power_alg_thr_tunning.xlsx`](tuning/power_alg_thr_tunning.xlsx). The final controller values are listed in [`../dpdk/config/power-paper.conf`](../dpdk/config/power-paper.conf).
 
 ## Helper scripts
 
