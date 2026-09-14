@@ -1,16 +1,18 @@
 # DPDK host implementation
 
-The host implementation is based on the `gNB_power_aware.c` application in EnergyTracer and the DPDK `l3fwd-power` example. The source import is pinned in `../sources.lock`.
+The host-side gNB application is based on EnergyTracer's `gNB_power_aware.c` and the DPDK `l3fwd-power` example. The imported source revision is recorded in [`../sources.lock`](../sources.lock).
 
-The reported platform uses DPDK 20.08. A matching DPDK 20.08 source tree is required because the application uses the `l3fwd-power` support files and DPDK power-management interfaces from that release.
+The experiments use DPDK 20.08. Use a matching DPDK 20.08 source tree because the application depends on the `l3fwd-power` support files and power-management interfaces from that release.
 
 ## Prepare the source
+
+From the repository root:
 
 ```bash
 make fetch
 ```
 
-or, if the upstream source is already present:
+If the upstream file is already present, rerun only the DPDK preparation step with:
 
 ```bash
 python3 scripts/prepare_dpdk.py
@@ -23,41 +25,41 @@ dpdk/src/power_aware/main.c
 dpdk/src/busy_wait/main.c
 ```
 
-The power-aware variant applies the parameter set in `config/power-paper.conf`. The busy-wait variant keeps the same gNB packet-processing path while disabling frequency and idle decisions.
+Both variants use the same gNB packet-processing path. The power-aware version enables the CPU frequency/idle policy used in the paper; the busy-wait version disables those decisions.
 
 ## Build with DPDK 20.08
 
-Copy one variant over the `l3fwd-power` main source in a clean DPDK 20.08 tree:
+Copy the selected `main.c` into a clean `l3fwd-power` example tree. For example:
 
 ```bash
 cp dpdk/src/power_aware/main.c <DPDK-20.08>/examples/l3fwd-power/main.c
 ```
 
-or:
+For busy waiting:
 
 ```bash
 cp dpdk/src/busy_wait/main.c <DPDK-20.08>/examples/l3fwd-power/main.c
 ```
 
-Keep the DPDK 20.08 `main.h`, `perf_core.c`, and `perf_core.h` from the same example directory. Build the example with the DPDK 20.08 toolchain used on the DUT.
+Keep `main.h`, `perf_core.c`, and `perf_core.h` from the same DPDK 20.08 example directory and build with the DPDK 20.08 toolchain.
 
-The gNB table configuration is selected through `GNB_CONFIG` rather than a machine-specific absolute path:
+Select the gNB table configuration at runtime with:
 
 ```bash
 export GNB_CONFIG=/path/to/config_table.json
 ```
 
-The config generator imported under `../p4/upstream/` can be used as the starting point for the 64k-entry DRB/TEID table.
+The configuration generator imported under `../p4/upstream/` can be used as the starting point for the 64k-entry DRB/TEID table.
 
 ## CPU and NUMA placement
 
-Each SmartNIC VF is assigned to a receive queue polled by one DPDK worker. Workers should be pinned to cores on the NUMA node local to the associated SmartNIC. Packet and clone pools should use NUMA-local hugepages.
+Each SmartNIC VF is handled by a DPDK worker. Pin each worker to a core on the NUMA node local to its SmartNIC, and allocate packet/clone pools from NUMA-local hugepages.
 
-The reported experiments use a 32-packet maximum burst. The worker/core counts vary with the placement and offered load; the experiment matrices under `../experiments/` identify the traffic operating points, while the exact CPU mapping should be recorded for every reproduced run.
+The experiments use a maximum burst of 32 packets. Worker counts depend on traffic direction, placement, and offered load. Keep the exact CPU map with the run metadata.
 
-## Power-aware configuration
+## Power-aware parameters
 
-The paper configuration is:
+The paper configuration is stored in [`config/power-paper.conf`](config/power-paper.conf):
 
 ```text
 MIN_EMPTY_POLL_COUNT=10
