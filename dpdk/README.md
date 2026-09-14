@@ -1,6 +1,6 @@
 # DPDK host implementation
 
-The host-side gNB application uses DPDK 20.08 and the `l3fwd-power` framework. The repository prepares two versions of the same packet-processing path:
+The host-side gNB application uses DPDK 20.08 and  the `l3fwd-power` framework. The repository prepares two versions of the same packet-processing path:
 
 - `power_aware`: adaptive CPU frequency and idle control;
 - `busy_wait`: the DPDK polling baseline.
