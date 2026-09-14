@@ -1,27 +1,49 @@
 # Experiments
 
-The CSV files in this directory define the operating points used in the paper. Traffic rate, processing placement, and DPDK power mode are kept separate so that each run can be launched and logged independently.
+The paper evaluates a fixed set of traffic operating points while processing placement and DPDK power mode are configured separately on the DUT.
 
-## Controlled operating points
+The traffic-side sequences are defined in [`../traffic/experiment_sweep.py`](../traffic/experiment_sweep.py). The main rate points are 7, 21, 35, 49, 63, 77, and 100 MPPS. Consecutive runs are separated by a 5 s gap by default.
 
-The standard offered-load points are 7, 21, 35, 49, 63, 77, and 100 MPPS.
+## Flow-based offloading
 
-- `flow/dl.csv` — DL SmartNIC-SA plus 30%, 50%, 70%, and 100% host offload.
-- `flow/ul.csv` — UL SmartNIC-SA plus 30%, 50%, 70%, and 100% host offload.
-- `function/dl.csv` — DL Split-0 through Split-4 under BW and PA.
-- `function/ul.csv` — UL Split-0 through Split-3 under BW and PA.
-- `latency/latency.csv` — SmartNIC-only, host-only, and selected function-based RTD cases.
-
-For the steady-state power measurements, TRex first reaches the target load and the system is allowed to stabilize. Power is then recorded over the 20 s window used in the paper.
-
-Placement is configured on the SmartNIC/DPDK side. The CSV files specify the corresponding traffic operating point and BW/PA mode. Generate TRex console commands with:
+Flow-based experiments use the same rate sequence with 0%, 30%, 50%, 70%, and 100% host offload. The offload tag is carried in the outer IPv4 Identification field.
 
 ```bash
-python3 traffic/run_matrix.py experiments/flow/dl.csv
+python3 traffic/experiment_sweep.py --suite flow --direction dl --duration 30 --gap 5
+python3 traffic/experiment_sweep.py --suite flow --direction ul --duration 30 --gap 5
+```
+
+## Function-based partitioning
+
+The processing split is selected on the SmartNIC/DPDK side. After configuring the DUT, run the corresponding 128-byte rate sweep:
+
+```bash
+python3 traffic/experiment_sweep.py --suite rate --direction dl --duration 30 --gap 5
+python3 traffic/experiment_sweep.py --suite rate --direction ul --duration 30 --gap 5
+```
+
+The evaluated DL placements are Split-0 through Split-4. The evaluated UL placements are Split-0 through Split-3. BW and PA use the same traffic sequence; only the host power-management mode changes.
+
+## Latency
+
+Latency measurements add a 50 kpps probe stream to the background traffic. The SmartNIC-only DL reference uses 7, 21, and 35 MPPS; the host and selected hybrid cases use the required load points from the paper.
+
+```bash
+python3 traffic/experiment_sweep.py --suite latency --direction dl --rates 7 21 35 --duration 30 --gap 5
 ```
 
 ## Daily operating points
 
-The `daily/` directory covers the reconstructed 24-hour analysis. Each hourly traffic level is measured as an independent one-minute TRex run; the day is reconstructed afterward from those operating points. DL uses Split-3 and UL uses Split-2.
+The 24-hour results are reconstructed from independent one-minute measurements rather than a continuous replay. The daily sweep evaluates DL and UL separately and uses the packet-size order reported in the paper:
 
-See the root README for the paper-to-file map and [`../docs/expected_results.md`](../docs/expected_results.md) for the reference values reported in the paper.
+```python
+[128, "imix", 590, 1518]
+```
+
+Run the sequence with:
+
+```bash
+python3 traffic/experiment_sweep.py --suite daily --duration 60 --gap 5
+```
+
+The daily placement is DL Split-3 and UL Split-2. The exact hourly traffic volumes are applied when reconstructing the daily result; they are not synthesized by the traffic generator.
