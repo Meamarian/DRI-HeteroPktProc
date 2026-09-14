@@ -1,6 +1,6 @@
 # P4 / SmartNIC processing
 
-The P4 implementation provides the SmartNIC-side gNB processing used in the experiments.
+The P4 implementation provides the SmartNIC-side gNB processing used in  the experiments.
 
 Fetch the files from the repository root with:
 
