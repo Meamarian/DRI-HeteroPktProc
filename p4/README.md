@@ -1,14 +1,14 @@
 # P4 / SmartNIC processing
 
-The P4 implementation comes from `Meamarian/Hybrid_P4_IFIP_WMNC_24` at the revision listed in [`../sources.lock`](../sources.lock).
+The P4 implementation provides the SmartNIC-side gNB processing used in the experiments.
 
-Fetch the source files with:
+Fetch the files from the repository root with:
 
 ```bash
-./scripts/fetch_upstream.sh
+make fetch
 ```
 
-They are placed under `p4/upstream/`:
+The main files are placed under `p4/upstream/`:
 
 ```text
 main.p4
@@ -19,8 +19,8 @@ p4_cfg_generator.py
 
 `main.p4` contains the gNB parser, TEID/DRB table logic, host-VF steering, and DL/UL protocol actions. `main_clone.p4` contains the SmartNIC cloning path used by the DL cloning case.
 
-The placement points evaluated in the paper are listed in [`SPLITS.md`](SPLITS.md). Across these placements, the SmartNIC keeps the common ingress parsing and steering logic while additional processing stages are moved between the SmartNIC and the host.
+The processing placements used in the paper are listed in [`SPLITS.md`](SPLITS.md). The SmartNIC keeps the common ingress parsing and steering logic, and each split moves additional gNB processing stages to the SmartNIC.
 
-For flow-based offloading, the traffic generator places the offload tag in the outer IPv4 Identification field. The tag selects whether a complete flow follows the SmartNIC path or is forwarded to the host.
+For flow-based offloading, the traffic generator places the path tag in the outer IPv4 Identification field. The tag selects the SmartNIC path or the host path for the complete flow.
 
-The earlier public IFIP repository does not contain a separate archived P4 program for every DL and UL split used in the journal evaluation. The available source is therefore kept unchanged here, and `SPLITS.md` documents the placement semantics. Archived split-specific P4 programs or firmware should be added separately if they become available.
+Use `base.p4cfg` and `p4_cfg_generator.py` to prepare the P4 runtime configuration and the 64k-entry DRB/TEID table used by the experiments.
