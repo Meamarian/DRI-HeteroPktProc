@@ -1,14 +1,14 @@
-# P4 and SmartNIC processing
+# P4 / SmartNIC processing
 
-The P4 implementation is imported from `Meamarian/Hybrid_P4_IFIP_WMNC_24` at the revision recorded in `../sources.lock`.
+The P4 implementation comes from `Meamarian/Hybrid_P4_IFIP_WMNC_24` at the revision listed in [`../sources.lock`](../sources.lock).
 
-Run:
+Fetch the source files with:
 
 ```bash
 ./scripts/fetch_upstream.sh
 ```
 
-The imported files are placed under `p4/upstream/`:
+They are placed under `p4/upstream/`:
 
 ```text
 main.p4
@@ -17,8 +17,10 @@ base.p4cfg
 p4_cfg_generator.py
 ```
 
-`main.p4` contains the gNB header parsing, DRB/TEID table logic, host-VF steering, and DL/UL protocol actions. `main_clone.p4` contains the SmartNIC cloning path used for the DL cloning case.
+`main.p4` contains the gNB parser, TEID/DRB table logic, host-VF steering, and DL/UL protocol actions. `main_clone.p4` contains the SmartNIC cloning path used by the DL cloning case.
 
-The paper evaluates the placement boundaries listed in `SPLITS.md`. The common P4 ingress parser, offload decision, and VF distributor remain on the SmartNIC for all split points. Flow-based assignment uses an offload tag carried in the IPv4 Identification field to select the SmartNIC or host path.
+The placement points evaluated in the paper are listed in [`SPLITS.md`](SPLITS.md). Across these placements, the SmartNIC keeps the common ingress parsing and steering logic while additional processing stages are moved between the SmartNIC and the host.
 
-The original public IFIP repository does not contain a separate P4 source file for every DL and UL split used in the journal evaluation. For that reason this repository preserves the exact available P4 sources and documents the split semantics without inventing unvalidated split-specific programs. Exact compiled P4 sources or firmware used for each reported split should be added under `p4/paper/` when the archived experiment copies are available.
+For flow-based offloading, the traffic generator places the offload tag in the outer IPv4 Identification field. The tag selects whether a complete flow follows the SmartNIC path or is forwarded to the host.
+
+The earlier public IFIP repository does not contain a separate archived P4 program for every DL and UL split used in the journal evaluation. The available source is therefore kept unchanged here, and `SPLITS.md` documents the placement semantics. Archived split-specific P4 programs or firmware should be added separately if they become available.
