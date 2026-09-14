@@ -1,16 +1,18 @@
-# Reconstructed 24-hour experiment
+# 24-hour workload reconstruction
 
-The daily analysis uses hourly traffic characteristics and does not require a continuous 24-hour TRex run. Each hour is represented by an independent one-minute operating point. The measured result is then weighted by that hour's traffic volume.
+The daily result is reconstructed from hourly operating points; it is not a continuous 24-hour TRex run. Each hourly traffic level is measured with an independent one-minute run, and the resulting measurements are weighted by the traffic volume for that hour.
 
-The paper uses DL Split-3 and UL Split-2. Measurements are performed separately for DL and UL and later combined for mixed-direction profiles.
+The daily evaluation uses:
 
-Packet profiles:
+- DL Split-3;
+- UL Split-2;
+- 128 B packets;
+- IMIX: 58.33% 64 B, 33.33% 590 B, 8.33% 1514 B;
+- 590 B packets;
+- 1518 B packets.
 
-- 128 B
-- IMIX: 58.33% 64 B, 33.33% 590 B, 8.33% 1514 B
-- 590 B
-- 1518 B
+DL and UL are measured separately and combined afterward when constructing mixed-direction profiles.
 
-`make_runs.py` reads `data/daily/hourly_profile_template.csv` or a completed equivalent and prints one TRex console command per required operating point. Use `--unique` to remove duplicate direction/rate/packet combinations.
+`make_runs.py` reads `data/daily/hourly_profile_template.csv` (or a completed copy) and prints the TRex command for each required operating point. Use `--unique` when the same direction/rate/packet combination appears more than once and only one measurement is needed.
 
-The template intentionally leaves the hourly MPPS values empty. The manuscript describes the source and reconstruction method but does not provide a numerical table of all 24 hourly rates. Use the exact hourly values from the experiment record or the source traffic dataset rather than values digitized approximately from a figure.
+The template leaves the hourly MPPS values empty because the paper does not print the complete 24-point numerical series. Fill it with the archived experiment values or the original traffic dataset rather than approximating values from the plot.
