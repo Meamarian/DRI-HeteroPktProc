@@ -1,8 +1,9 @@
 # DPDK host implementation
 
-The host-side gNB application is based on EnergyTracer's `gNB_power_aware.c` and the DPDK `l3fwd-power` example. The imported source revision is recorded in [`../sources.lock`](../sources.lock).
+The host-side gNB application uses DPDK 20.08 and the `l3fwd-power` framework. The repository prepares two versions of the same packet-processing path:
 
-The experiments use DPDK 20.08. Use a matching DPDK 20.08 source tree because the application depends on the `l3fwd-power` support files and power-management interfaces from that release.
+- `power_aware`: adaptive CPU frequency and idle control;
+- `busy_wait`: the DPDK polling baseline.
 
 ## Prepare the source
 
@@ -12,7 +13,7 @@ From the repository root:
 make fetch
 ```
 
-If the upstream file is already present, rerun only the DPDK preparation step with:
+To regenerate the DPDK files after changing the power configuration:
 
 ```bash
 python3 scripts/prepare_dpdk.py
@@ -25,23 +26,21 @@ dpdk/src/power_aware/main.c
 dpdk/src/busy_wait/main.c
 ```
 
-Both variants use the same gNB packet-processing path. The power-aware version enables the CPU frequency/idle policy used in the paper; the busy-wait version disables those decisions.
-
 ## Build with DPDK 20.08
 
-Copy the selected `main.c` into a clean `l3fwd-power` example tree. For example:
+Copy the selected `main.c` into a DPDK 20.08 `l3fwd-power` example tree. For example:
 
 ```bash
 cp dpdk/src/power_aware/main.c <DPDK-20.08>/examples/l3fwd-power/main.c
 ```
 
-For busy waiting:
+For the busy-wait baseline:
 
 ```bash
 cp dpdk/src/busy_wait/main.c <DPDK-20.08>/examples/l3fwd-power/main.c
 ```
 
-Keep `main.h`, `perf_core.c`, and `perf_core.h` from the same DPDK 20.08 example directory and build with the DPDK 20.08 toolchain.
+Use `main.h`, `perf_core.c`, and `perf_core.h` from the same DPDK 20.08 example directory and build with the DPDK 20.08 toolchain.
 
 Select the gNB table configuration at runtime with:
 
@@ -49,13 +48,13 @@ Select the gNB table configuration at runtime with:
 export GNB_CONFIG=/path/to/config_table.json
 ```
 
-The configuration generator imported under `../p4/upstream/` can be used as the starting point for the 64k-entry DRB/TEID table.
+The P4 configuration generator under `../p4/upstream/` can be used to prepare the 64k-entry DRB/TEID table.
 
 ## CPU and NUMA placement
 
-Each SmartNIC VF is handled by a DPDK worker. Pin each worker to a core on the NUMA node local to its SmartNIC, and allocate packet/clone pools from NUMA-local hugepages.
+Each SmartNIC VF is handled by a DPDK worker. Pin each worker to a CPU core on the NUMA node local to its SmartNIC and allocate packet/clone pools from NUMA-local hugepages.
 
-The experiments use a maximum burst of 32 packets. Worker counts depend on traffic direction, placement, and offered load. Keep the exact CPU map with the run metadata.
+The experiments use a maximum burst of 32 packets. Worker counts depend on traffic direction, function placement, and offered load. Record the CPU map with each run.
 
 ## Power-aware parameters
 
@@ -77,4 +76,4 @@ SCALING_DOWN_SLEEP_RATIO_THR=0.25
 MAX_PKT_BURST=32
 ```
 
-The uncore frequency is fixed at 1.4 GHz in the reported measurements.
+The reported measurements use a fixed uncore frequency of 1.4 GHz.
