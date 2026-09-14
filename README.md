@@ -312,7 +312,7 @@ For short steady-state experiments, TRex reaches the target traffic load before 
 
 ---
 
-## 7. Reconstructed 24-hour evaluation
+## 7. 24-hour evaluation
 
 Each hourly traffic load is measured as a **one-minute TRex operating point**. The hourly measurements are then weighted by the corresponding traffic volumes and combined into the 24-hour evaluation.
 
@@ -336,6 +336,6 @@ The EnergyTracer tools support event-level analysis, while the TRex sweep provid
 
 ---
 
-## Citation
+## Contact
 
-Citation metadata is provided in [`CITATION.cff`](CITATION.cff).
+If you have any question about the repo, please contact mohsen.memarian@kau.se
